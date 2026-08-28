@@ -47,11 +47,19 @@ where
         let c_fil = Color {r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
         //apparetnly, we can draw a rectangle! and the final argument is anything htat can be turend
         //in to a "fill", that includes colors
-        frame.fill_rectangle(Point::new(10.0, 10.0), Size::new(10.0, 10.0),  c_fil );
+        //frame.fill_rectangle(Point::new(10.0, 10.0), Size::new(10.0, 10.0),  c_fil );
 
         //and this path is the thing i think i actually eventually need... this is what i need
         //to get to work, cause it can work with arcs and stuff
-        let path = iced::advanced::graphics::geometry::path::Path::new( move |build_thingy: &mut iced::advanced::graphics::geometry::path::Builder| {} );
+        let path = iced::advanced::graphics::geometry::path::Path::new( move |build_thingy: &mut iced::advanced::graphics::geometry::path::Builder| {
+            build_thingy.move_to(Point::new(0.0, 0.0)); 
+            build_thingy.line_to(Point::new(100.0, 100.0));
+            build_thingy.move_to(Point::new(100.0, 450.0)); 
+            //build_thingy.arc_to(Point::new(100.0, 200.0), Point::new(10.0, 100.0),  180.0);
+        }
+        );
+        let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default(); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
+        frame.stroke(&path,stroke );
         let geometry = frame.into_geometry();
         renderer.draw_geometry(geometry);
         
