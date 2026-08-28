@@ -55,7 +55,8 @@ where
             build_thingy.move_to(Point::new(0.0, 0.0)); 
             build_thingy.line_to(Point::new(100.0, 100.0));
             build_thingy.move_to(Point::new(100.0, 450.0)); 
-            //build_thingy.arc_to(Point::new(100.0, 200.0), Point::new(10.0, 100.0),  180.0);
+
+            //THIS IS WHERE I WANT TO DRAW THE ARC THING!
         }
         );
         let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default(); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
