@@ -1,9 +1,8 @@
+use iced::advanced::graphics::geometry::frame::Backend;
 use iced::advanced::layout::{Limits, Node};
 use iced::advanced::{renderer, widget::Tree, Widget};
 use iced::widget::{canvas, column, text, Canvas, Column};
-use iced::{border, Center, Color, Element, Point, Size, Length};
-use iced::advanced::graphics::geometry::frame::Backend;
-//use iced::advanced::iced_graphics::geometry::frame::Backend
+use iced::{border, Center, Color, Element, Length, Point, Size};
 
 //Alright, this is the struct that's eventually going to be the widget.. i'll try to just get it to
 //draw itself first
@@ -32,6 +31,7 @@ where
     //where i seem to be stuck.. lets investigate into what a renderer is even supposed to do..
     fn draw(
         &self,
+        //
         tree: &Tree,
         renderer: &mut Renderer,
         theme: &Theme,
@@ -44,26 +44,33 @@ where
         //can't use that for a cool ring graph :(
         let mut frame = renderer.new_frame(layout.bounds());
         //this is a color, i needed it for the line below
-        let c_fil = Color {r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
-        //apparetnly, we can draw a rectangle! and the final argument is anything htat can be turend
-        //in to a "fill", that includes colors
-        //frame.fill_rectangle(Point::new(10.0, 10.0), Size::new(10.0, 10.0),  c_fil );
+        let c_fil = Color {
+            r: 1.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        };
 
+        //I want to draw the ring graph at the center of the available space
+        let frame_center = layout.bounds().center();
         //and this path is the thing i think i actually eventually need... this is what i need
         //to get to work, cause it can work with arcs and stuff
-        let path = iced::advanced::graphics::geometry::path::Path::new( move |build_thingy: &mut iced::advanced::graphics::geometry::path::Builder| {
-            build_thingy.move_to(Point::new(0.0, 0.0)); 
-            build_thingy.line_to(Point::new(100.0, 100.0));
-            build_thingy.move_to(Point::new(100.0, 450.0)); 
+        let path = iced::advanced::graphics::geometry::path::Path::new(
+            move |path_builder: &mut iced::advanced::graphics::geometry::path::Builder| {
+                let arc = iced::widget::canvas::path::arc::Arc {
+                    center: frame_center,
+                    radius: self.radius,
+                    start_angle: iced::Radians(0.0),
+                    end_angle: iced::Radians(4.0),
+                };
 
-            //THIS IS WHERE I WANT TO DRAW THE ARC THING!
-        }
+                path_builder.arc(arc);
+            },
         );
-        let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default(); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
-        frame.stroke(&path,stroke );
+        let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default().with_width(40.0); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
+        frame.stroke(&path, stroke);
         let geometry = frame.into_geometry();
         renderer.draw_geometry(geometry);
-        
     }
 }
 
