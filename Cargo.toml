@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 iced = { git = "https://github.com/iced-rs/iced", package = "iced", features = ["canvas", "debug", "advanced"] }
+rand = "0.10.2"
 #iced_graphics = "0.14.0"

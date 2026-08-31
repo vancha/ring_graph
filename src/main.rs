@@ -1,9 +1,9 @@
 use iced::advanced::graphics::geometry::frame::Backend;
+use iced::advanced::graphics::geometry::path::Builder as PathBuilder;
 use iced::advanced::layout::{Limits, Node};
-use iced::advanced::{renderer, widget::Tree, Widget};
-use iced::widget::{canvas, column, text, Canvas, Column};
-use iced::{border, Center, Color, Element, Length, Point, Size};
-
+use iced::advanced::{widget::Tree, Widget};
+use iced::widget::{canvas, column, Column};
+use iced::{Color, Element, Length, Point, Size};
 //Alright, this is the struct that's eventually going to be the widget.. i'll try to just get it to
 //draw itself first
 struct RingGraph {
@@ -32,53 +32,40 @@ where
     fn draw(
         &self,
         //
-        tree: &Tree,
+        _tree: &Tree,
         renderer: &mut Renderer,
-        theme: &Theme,
-        style: &iced::advanced::renderer::Style,
+        _theme: &Theme,
+        _style: &iced::advanced::renderer::Style,
         layout: iced::advanced::Layout<'_>,
-        cursor: iced::mouse::Cursor,
-        viewport: &iced::Rectangle,
+        _cursor: iced::mouse::Cursor,
+        _viewport: &iced::Rectangle,
     ) {
         //the example thingy here can only do the fill_quad shape with a color and some borders...
         //can't use that for a cool ring graph :(
         let mut frame = renderer.new_frame(layout.bounds());
-        //this is a color, i needed it for the line below
-        let c_fil = Color {
-            r: 1.0,
-            g: 0.0,
-            b: 0.0,
-            a: 1.0,
-        };
-
         //I want to draw the ring graph at the center of the available space
         let frame_center = layout.bounds().center();
 
+        let slices = self.generate_slices_around(frame_center);
 
-        let segments = self.draw_segments_around(frame_center);
-
-
-        //and this path is the thing i think i actually eventually need... this is what i need
-        //to get to work, cause it can work with arcs and stuff
-        let path = iced::advanced::graphics::geometry::path::Path::new(
-            move |path_builder: &mut iced::advanced::graphics::geometry::path::Builder| {
-                let arc = iced::widget::canvas::path::arc::Arc {
-                    center: frame_center,
-                    radius: self.radius,
-                    start_angle: iced::Radians(0.0),
-                    end_angle: iced::Radians(4.0),
-                };
-
-                path_builder.arc(arc);
-            },
-        );
-        let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default().with_width(40.0).with_color(Color {r:0.5, g:0.2,b:0.8,a:1.0}); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
-        frame.stroke(&path, stroke);
+        for slice in slices {
+            //println!("the path for the slice i'm drawing is {:?}", slice.path);
+            let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default()
+                .with_width(40.0)
+                .with_color(slice.color); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
+            frame.stroke(&slice.path, stroke);
+        }
         let geometry = frame.into_geometry();
         renderer.draw_geometry(geometry);
     }
 }
 
+// A slice of the ring-graph, can be stroked to a frame.
+#[derive(Debug)]
+struct Slice {
+    path: iced::advanced::graphics::geometry::path::Path,
+    color: Color,
+}
 //This contains the rest of the methods(?) that i want to add to the ring graph. I can't put it in the
 //Widget trait implementation above, because my own functions are "Not a member of trait `Widget`"
 impl RingGraph {
@@ -91,35 +78,55 @@ impl RingGraph {
     //calculate what percentage(angle) of 100% (360 degrees) each individual
     //value has. Returns a vec of angles in degrees (or radians haven't figured that out)
     fn values_into_angles(&self, values: &Vec<i32>) -> Vec<f64> {
-        let sum:i32 = values.iter().sum();
+        let sum: i32 = values.iter().sum();
         //I think this is where i calculate what percentage every
         //individual value is of the total
-        let percentages = values.into_iter().map(|value| (*value as f64 / sum as f64)*100.0 ).collect::<Vec<f64>>();
-        println!("percentages: {:?}",percentages);
-        let angles = percentages.into_iter().map(|percentage| 360.0 * (percentage / 100.0) ).collect::<Vec<f64>>();
-        println!("angles: {:?}",angles);
-        return angles;
+        let percentages = values
+            .iter()
+            .map(|value| (*value as f64 / sum as f64) * 100.0)
+            .collect::<Vec<f64>>();
+        percentages
+            .into_iter()
+            .map(|percentage| 360.0 * (percentage / 100.0))
+            .collect::<Vec<f64>>()
     }
 
-    //This is the thing that draws the individual segments using a renderer, which probably needs
-    fn draw_segments_around(&self, center: Point) -> Vec<iced::advanced::graphics::geometry::path::Path> {
+    //This is the thing that generates the individual slices to draw
+    fn generate_slices_around(&self, center: Point) -> Vec<Slice> {
         let segments = self.values_into_angles(&self.values);
+        let mut start_angle = 0.0f64;
+        let mut paths = vec![];
+        for segment in segments {
+            let path = iced::advanced::graphics::geometry::path::Path::new(
+                |path_builder: &mut PathBuilder| {
+                    let arc = canvas::path::arc::Arc {
+                        center,
+                        radius: self.radius,
+                        start_angle: iced::Radians::from(iced::Degrees(start_angle as f32)),
+                        end_angle: iced::Radians::from(iced::Degrees(
+                            start_angle as f32 + segment as f32,
+                        )),
+                    };
+                    path_builder.arc(arc);
+                },
+            );
 
-        segment.map( |angle|  )
-        let path = iced::advanced::graphics::geometry::path::Path::new(
-            move |path_builder: &mut iced::advanced::graphics::geometry::path::Builder| {
-                let arc = iced::widget::canvas::path::arc::Arc {
-                    center: center,
-                    radius: self.radius,
-                    start_angle: iced::Radians(0.0),
-                    end_angle: iced::Radians(4.0),
-                };
+            start_angle += segment;
+            let num: [f32; 3] = rand::random();
+            let slice = Slice {
+                path,
+                color: Color {
+                    r: num[0],
+                    g: num[1],
+                    b: num[2],
+                    a: 1.0,
+                },
+            };
 
-                path_builder.arc(arc);
-            },
-        );
-
-        //vec![]
+            paths.push(slice);
+        }
+        println!("{:?}", paths);
+        paths
     }
 }
 
@@ -150,12 +157,7 @@ impl Application {
 
     //Here we build our view from widgets and stuff
     fn view(&self) -> Column<'_, Message> {
-        column![
-            RingGraph::new(
-                50.0,
-                vec![1,2,3,4],
-            )
-        ]
+        column![RingGraph::new(50.0, vec![1, 2, 3, 4],)]
     }
 }
 
