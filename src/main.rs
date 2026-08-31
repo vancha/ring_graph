@@ -8,6 +8,7 @@ use iced::{Color, Element, Length, Point, Size};
 //draw itself first
 struct RingGraph {
     radius: f32,
+    //slices:Vec<Slice>,
     values: Vec<i32>,
 }
 
@@ -49,7 +50,6 @@ where
         let slices = self.generate_slices_around(frame_center);
 
         for slice in slices {
-            //println!("the path for the slice i'm drawing is {:?}", slice.path);
             let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default()
                 .with_width(40.0)
                 .with_color(slice.color); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
@@ -81,12 +81,9 @@ impl RingGraph {
         let sum: i32 = values.iter().sum();
         //I think this is where i calculate what percentage every
         //individual value is of the total
-        let percentages = values
+        values
             .iter()
             .map(|value| (*value as f64 / sum as f64) * 100.0)
-            .collect::<Vec<f64>>();
-        percentages
-            .into_iter()
             .map(|percentage| 360.0 * (percentage / 100.0))
             .collect::<Vec<f64>>()
     }
@@ -111,7 +108,7 @@ impl RingGraph {
                 },
             );
 
-            start_angle += segment;
+            start_angle += segment as f64;
             let num: [f32; 3] = rand::random();
             let slice = Slice {
                 path,
@@ -125,7 +122,6 @@ impl RingGraph {
 
             paths.push(slice);
         }
-        println!("{:?}", paths);
         paths
     }
 }
@@ -164,3 +160,4 @@ impl Application {
 pub fn main() -> iced::Result {
     iced::run(Application::update, Application::view)
 }
+
