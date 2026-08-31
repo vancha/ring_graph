@@ -8,10 +8,11 @@ use iced::{border, Center, Color, Element, Length, Point, Size};
 //draw itself first
 struct RingGraph {
     radius: f32,
+    values: Vec<i32>,
 }
 
 //This is the required trait for something that wants to present itself as an iced widget.
-impl<Message, Theme, Renderer> iced::advanced::Widget<Message, Theme, Renderer> for RingGraph
+impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for RingGraph
 where
     Renderer: iced::advanced::graphics::geometry::Renderer,
 {
@@ -26,7 +27,6 @@ where
     fn layout(&mut self, _: &mut Tree, _: &Renderer, limits: &Limits) -> Node {
         Node::new(limits.max())
     }
-
     //Okay so apparently i'm just given a renderer and I should do something with this? First part
     //where i seem to be stuck.. lets investigate into what a renderer is even supposed to do..
     fn draw(
@@ -53,6 +53,11 @@ where
 
         //I want to draw the ring graph at the center of the available space
         let frame_center = layout.bounds().center();
+
+
+        let segments = self.draw_segments_around(frame_center);
+
+
         //and this path is the thing i think i actually eventually need... this is what i need
         //to get to work, cause it can work with arcs and stuff
         let path = iced::advanced::graphics::geometry::path::Path::new(
@@ -67,17 +72,54 @@ where
                 path_builder.arc(arc);
             },
         );
-        let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default().with_width(40.0); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
+        let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default().with_width(40.0).with_color(Color {r:0.5, g:0.2,b:0.8,a:1.0}); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
         frame.stroke(&path, stroke);
         let geometry = frame.into_geometry();
         renderer.draw_geometry(geometry);
     }
 }
 
-//lets give ourselves an easy way to construct it? I don't know, this seems common, i've seen other peopel do it
+//This contains the rest of the methods(?) that i want to add to the ring graph. I can't put it in the
+//Widget trait implementation above, because my own functions are "Not a member of trait `Widget`"
 impl RingGraph {
-    fn new(radius: f32) -> Self {
-        RingGraph { radius }
+    //lets give ourselves an easy way to construct it? I don't know, this seems common in rust
+    fn new(radius: f32, values: Vec<i32>) -> Self {
+        RingGraph { radius, values }
+    }
+
+    //This should basically sum up all the values passed in as an argument, and
+    //calculate what percentage(angle) of 100% (360 degrees) each individual
+    //value has. Returns a vec of angles in degrees (or radians haven't figured that out)
+    fn values_into_angles(&self, values: &Vec<i32>) -> Vec<f64> {
+        let sum:i32 = values.iter().sum();
+        //I think this is where i calculate what percentage every
+        //individual value is of the total
+        let percentages = values.into_iter().map(|value| (*value as f64 / sum as f64)*100.0 ).collect::<Vec<f64>>();
+        println!("percentages: {:?}",percentages);
+        let angles = percentages.into_iter().map(|percentage| 360.0 * (percentage / 100.0) ).collect::<Vec<f64>>();
+        println!("angles: {:?}",angles);
+        return angles;
+    }
+
+    //This is the thing that draws the individual segments using a renderer, which probably needs
+    fn draw_segments_around(&self, center: Point) -> Vec<iced::advanced::graphics::geometry::path::Path> {
+        let segments = self.values_into_angles(&self.values);
+
+        segment.map( |angle|  )
+        let path = iced::advanced::graphics::geometry::path::Path::new(
+            move |path_builder: &mut iced::advanced::graphics::geometry::path::Builder| {
+                let arc = iced::widget::canvas::path::arc::Arc {
+                    center: center,
+                    radius: self.radius,
+                    start_angle: iced::Radians(0.0),
+                    end_angle: iced::Radians(4.0),
+                };
+
+                path_builder.arc(arc);
+            },
+        );
+
+        //vec![]
     }
 }
 
@@ -108,7 +150,12 @@ impl Application {
 
     //Here we build our view from widgets and stuff
     fn view(&self) -> Column<'_, Message> {
-        column![RingGraph::new(50.0),]
+        column![
+            RingGraph::new(
+                50.0,
+                vec![1,2,3,4],
+            )
+        ]
     }
 }
 
