@@ -14,6 +14,7 @@ struct RingGraph {
     values: Vec<i32>,
 }
 
+/*This is the required trait for something that wants to present itself as an iced widget.
 @TODO: note that this trait also has a method called state, and this seems exactly like the thing i will need
 to make sure that my widget doesn't literally redraw itself every frame! look at this:
 
