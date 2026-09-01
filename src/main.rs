@@ -4,15 +4,38 @@ use iced::advanced::layout::{Limits, Node};
 use iced::advanced::{widget::Tree, Widget};
 use iced::widget::{canvas, column, Column};
 use iced::{Color, Element, Length, Point, Size};
-//Alright, this is the struct that's eventually going to be the widget.. i'll try to just get it to
-//draw itself first
+
+//The custom widget struct, should hold only the data
+//required to draw the graph. Might take an argument to add
+//fixed-angle whitespace between each segment (like matplotlibs wedgeprops)
 struct RingGraph {
     radius: f32,
     //slices:Vec<Slice>,
     values: Vec<i32>,
 }
 
-//This is the required trait for something that wants to present itself as an iced widget.
+@TODO: note that this trait also has a method called state, and this seems exactly like the thing i will need
+to make sure that my widget doesn't literally redraw itself every frame! look at this:
+
+```rust
+fn state(&self) -> widget::tree::State {
+    widget::tree::State::new(State::default())
+}```
+
+This is how https://github.com/Osso/iced-widgets/blob/master/src/list.rs#L250 did it, and it implemented the "state"
+struct as follows:
+```rust
+#[derive(Debug, Clone, Default)]
+struct State {
+    selected: Option<usize>,
+    viewport_height: f32,
+    item_count: usize,
+    scroll_offset: Rc<Cell<f32>>,
+    /// Last external selection we scrolled to (to detect changes)
+    last_scrolled_to: Option<usize>,
+}
+```
+*/
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for RingGraph
 where
     Renderer: iced::advanced::graphics::geometry::Renderer,
@@ -61,6 +84,7 @@ where
 }
 
 // A slice of the ring-graph, can be stroked to a frame.
+// @todo: i don't like iced stuff mixing in with my graph code :(
 #[derive(Debug)]
 struct Slice {
     path: iced::advanced::graphics::geometry::path::Path,
