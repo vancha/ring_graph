@@ -132,6 +132,9 @@ struct Slice {
         //I want to draw the ring graph at the center of the available space
         let frame_center = layout.bounds().center();
 
+
+        //THIS IS THE PROBLEM! DON't Generate it like this, get it from the state! (the tree argument to this method holds the state)
+        //also, the state function we implemented *sets* 
         let slices = self.generate_slices_around(frame_center);
 
         for slice in slices {
@@ -146,6 +149,7 @@ struct Slice {
         }
         /* We need to have *something* that */
         fn state(&self) -> State { 
+                println!("CREATING LE STATE.. should happen exactly only once :)");
                 State::Some(Box::new(RingGraphState::new(self.values.clone().into())))
 
          }
