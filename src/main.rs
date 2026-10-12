@@ -1,70 +1,131 @@
-use iced::advanced::graphics::geometry::frame::Backend;
-use iced::advanced::graphics::geometry::path::Builder as PathBuilder;
-use iced::advanced::layout::{Limits, Node};
-use iced::advanced::{widget::Tree, Widget};
-use iced::widget::{canvas, column, Column};
-use iced::{Color, Element, Length, Point, Size};
-
-//The custom widget struct, should hold only the data
-//required to draw the graph. Might take an argument to add
-//fixed-angle whitespace between each segment (like matplotlibs wedgeprops)
-struct RingGraph {
-    radius: f32,
-    //slices:Vec<Slice>,
-    values: Vec<i32>,
+//! This example showcases a simple native custom widget that draws a circle.
+mod circle {
+    use iced::advanced::layout::{self, Layout};
+    use iced::advanced::renderer;
+    use iced::advanced::widget::{self, Widget, tree::{State,Tag}};
+    use iced::advanced::graphics::geometry::path::Builder as PathBuilder;
+    use iced::widget::{canvas};
+    use iced::border;
+    use iced::mouse;
+    use iced::advanced::graphics::geometry::path::Path;
+    //use iced::advanced::graphics::geometry::Cache;
+    use std::ops::Add;
+    use iced::{Color, Length, Rectangle, Size, Point};
+    use iced::advanced::graphics::geometry::frame::Backend;
+    
+#[derive(Debug)]
+struct Slice {
+    path: iced::advanced::graphics::geometry::path::Path,
+    color: Color,
 }
 
-/*This is the required trait for something that wants to present itself as an iced widget.
-@TODO: note that this trait also has a method called state, and this seems exactly like the thing i will need
-to make sure that my widget doesn't literally redraw itself every frame! look at this:
 
-```rust
-fn state(&self) -> widget::tree::State {
-    widget::tree::State::new(State::default())
-}```
-
-This is how https://github.com/Osso/iced-widgets/blob/master/src/list.rs#L250 did it, and it implemented the "state"
-struct as follows:
-```rust
-#[derive(Debug, Clone, Default)]
-struct State {
-    selected: Option<usize>,
-    viewport_height: f32,
-    item_count: usize,
-    scroll_offset: Rc<Cell<f32>>,
-    /// Last external selection we scrolled to (to detect changes)
-    last_scrolled_to: Option<usize>,
-}
-```
-*/
-impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for RingGraph
-where
-    Renderer: iced::advanced::graphics::geometry::Renderer,
-{
-    //This is required, just tell the caller that i want all the space please
-    fn size(&self) -> Size<Length> {
-        Size::new(Length::Fill, Length::Fill)
+    pub struct RingGraph {
+        radius: f32,
+        values: Vec<i32>,
     }
 
-    //This layout::Node is used by the runtime to compute the Layout of the user interface. Looks
-    //like limits is what we have available to us, lets turn that into a node that encapsulates it
-    //all? Hopefully this will let us continue
-    fn layout(&mut self, _: &mut Tree, _: &Renderer, limits: &Limits) -> Node {
-        Node::new(limits.max())
+    pub struct RingGraphState {
+        //cache: Cache<Renderer>,
+        values: Vec<i32>,
     }
-    //Okay so apparently i'm just given a renderer and I should do something with this? First part
-    //where i seem to be stuck.. lets investigate into what a renderer is even supposed to do..
-    fn draw(
-        &self,
-        //
-        _tree: &Tree,
-        renderer: &mut Renderer,
-        _theme: &Theme,
-        _style: &iced::advanced::renderer::Style,
-        layout: iced::advanced::Layout<'_>,
-        _cursor: iced::mouse::Cursor,
-        _viewport: &iced::Rectangle,
-    ) {
+
+    impl RingGraphState  {
+         fn new(values: Vec<i32>) -> Self {
+            Self { values }
+        }
+
+    }
+
+    impl RingGraph {
+
+        pub fn new(radius: f32, values: Vec<i32>)  -> Self  {
+
+            Self { radius: 100.0, values }
+        }
+
+        fn values_into_angles(&self, values: &Vec<i32>) -> Vec<f64> {
+            let sum: i32 = values.iter().sum();
+            //I think this is where i calculate what percentage every
+            //individual value is of the total
+            values
+                .iter()
+                .map(|value| (*value as f64 / sum as f64) * 100.0)
+                .map(|percentage| 360.0 * (percentage / 100.0))
+                .collect::<Vec<f64>>()
+        }
+
+        fn generate_slices_around(&self, center: Point) -> Vec<Slice> {
+            let segments = self.values_into_angles(&self.values);
+            let mut start_angle = 0.0f64;
+            let mut paths = vec![];
+            for segment in segments {
+                let path = iced::advanced::graphics::geometry::path::Path::new(
+                    |path_builder: &mut PathBuilder| {
+                        let arc = canvas::path::arc::Arc {
+                            center,
+                            radius: self.radius,
+                            start_angle: iced::Radians::from(iced::Degrees(start_angle as f32)),
+                            end_angle: iced::Radians::from(iced::Degrees(
+                                start_angle as f32 + segment as f32,
+                            )),
+                        };
+                        path_builder.arc(arc);
+                    },
+                );
+
+                start_angle += segment as f64;
+                let num: [f32; 3] = rand::random();
+                let slice = Slice {
+                    path,
+                    color: Color {
+                        r: num[0],
+                        g: num[1],
+                        b: num[2],
+                        a: 1.0,
+                    },
+                };
+
+                paths.push(slice);
+            }
+            paths
+        }
+    }
+
+    pub fn circle(radius: f32) -> RingGraph {
+        RingGraph::new(radius, vec![1,2,3,4])
+    }
+
+    impl widget::Meta for RingGraph {}
+
+    impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for RingGraph
+    where
+        Renderer: iced::advanced::graphics::geometry::Renderer,
+    {
+        fn size(&self) -> Size<Length> {
+            Size::new(Length::Fill, Length::Fill)
+        }
+
+        fn layout(
+            &mut self,
+            tree: &mut widget::Tree,
+            _renderer: &Renderer,
+            limits: &layout::Limits,
+        ) {
+            //Node::new(limits.max())
+            tree.size = limits.bounds();//Size::new(self.radius * 2.0, self.radius * 2.0);
+        }
+
+        fn draw(
+            &self,
+            _tree: &widget::Tree,
+            renderer: &mut Renderer,
+            _theme: &Theme,
+            _style: &renderer::Style,
+            layout: Layout,
+            _cursor: mouse::Cursor,
+            _viewport: &Rectangle,
+        ) {
         //the example thingy here can only do the fill_quad shape with a color and some borders...
         //can't use that for a cool ring graph :(
         let mut frame = renderer.new_frame(layout.bounds());
@@ -75,114 +136,65 @@ where
 
         for slice in slices {
             let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default()
-                .with_width(40.0)
-                .with_color(slice.color); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
+                .with_width(30.0)
+                .with_color(slice.color)
+                .with_line_cap(iced::widget::canvas::LineCap::Round); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
             frame.stroke(&slice.path, stroke);
         }
         let geometry = frame.into_geometry();
         renderer.draw_geometry(geometry);
-    }
-}
-
-// A slice of the ring-graph, can be stroked to a frame.
-// @todo: i don't like iced stuff mixing in with my graph code :(
-#[derive(Debug)]
-struct Slice {
-    path: iced::advanced::graphics::geometry::path::Path,
-    color: Color,
-}
-//This contains the rest of the methods(?) that i want to add to the ring graph. I can't put it in the
-//Widget trait implementation above, because my own functions are "Not a member of trait `Widget`"
-impl RingGraph {
-    //lets give ourselves an easy way to construct it? I don't know, this seems common in rust
-    fn new(radius: f32, values: Vec<i32>) -> Self {
-        RingGraph { radius, values }
-    }
-
-    //This should basically sum up all the values passed in as an argument, and
-    //calculate what percentage(angle) of 100% (360 degrees) each individual
-    //value has. Returns a vec of angles in degrees (or radians haven't figured that out)
-    fn values_into_angles(&self, values: &Vec<i32>) -> Vec<f64> {
-        let sum: i32 = values.iter().sum();
-        //I think this is where i calculate what percentage every
-        //individual value is of the total
-        values
-            .iter()
-            .map(|value| (*value as f64 / sum as f64) * 100.0)
-            .map(|percentage| 360.0 * (percentage / 100.0))
-            .collect::<Vec<f64>>()
-    }
-
-    //This is the thing that generates the individual slices to draw
-    fn generate_slices_around(&self, center: Point) -> Vec<Slice> {
-        let segments = self.values_into_angles(&self.values);
-        let mut start_angle = 0.0f64;
-        let mut paths = vec![];
-        for segment in segments {
-            let path = iced::advanced::graphics::geometry::path::Path::new(
-                |path_builder: &mut PathBuilder| {
-                    let arc = canvas::path::arc::Arc {
-                        center,
-                        radius: self.radius,
-                        start_angle: iced::Radians::from(iced::Degrees(start_angle as f32)),
-                        end_angle: iced::Radians::from(iced::Degrees(
-                            start_angle as f32 + segment as f32,
-                        )),
-                    };
-                    path_builder.arc(arc);
-                },
-            );
-
-            start_angle += segment as f64;
-            let num: [f32; 3] = rand::random();
-            let slice = Slice {
-                path,
-                color: Color {
-                    r: num[0],
-                    g: num[1],
-                    b: num[2],
-                    a: 1.0,
-                },
-            };
-
-            paths.push(slice);
         }
-        paths
+        /* We need to have *something* that */
+        fn state(&self) -> State { 
+                State::Some(Box::new(RingGraphState::new(self.values.clone().into())))
+
+         }
+         fn tag(&self) -> Tag {
+            Tag::of::<RingGraphState>()
+         }
     }
 }
 
-//this weird looking thing makes the column![RingGraph::new(5.0), ] stuff possible
-//you can't do that unless you can turn a RingGraph into an Element
-impl<Message, Theme, Renderer> From<RingGraph> for Element<'_, Message, Theme, Renderer>
-where
-    Renderer: iced::advanced::graphics::geometry::Renderer, //renderer::Renderer,
-{
-    fn from(ring_graph: RingGraph) -> Self {
-        Self::new(ring_graph)
-    }
-}
-
-//no message variants just yet, lets keep it empty
-#[derive(Debug, Clone, Copy)]
-enum Message {}
-
-//The thing for which we implement our elm architecture functions
-#[derive(Default)]
-struct Application {}
-
-impl Application {
-    //Here we respond to updates that get emitted from the view, it should update our app state
-    fn update(&mut self, message: Message) {
-        match message {}
-    }
-
-    //Here we build our view from widgets and stuff
-    fn view(&self) -> Column<'_, Message> {
-        column![RingGraph::new(50.0, vec![1, 2, 3, 4],)]
-    }
-}
+use circle::circle;
+use iced::widget::{center, column, slider, text};
+use iced::{Center, Fit, Widget};
 
 pub fn main() -> iced::Result {
-    iced::run(Application::update, Application::view)
+    iced::run(Example::update, Example::view)
+}
+
+struct Example {
+    radius: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Message {
+}
+
+impl Example {
+    fn new() -> Self {
+        Example { radius: 50.0 }
+    }
+
+    fn update(&mut self, message: Message) {
+    }
+
+    fn view(&self) -> impl Widget<Message> {
+        let content = column![
+            circle(self.radius),
+        ]
+        .padding(20);
+        //.spacing(20)
+        //.width(Fit.max(500))
+        //.align_x(Center);
+
+        center(content)
+    }
+}
+
+impl Default for Example {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
