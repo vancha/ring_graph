@@ -1,5 +1,5 @@
 //! This example showcases a simple native custom widget that draws a circle.
-mod circle {
+mod ring_graph {
     use iced::advanced::layout::{self, Layout};
     use iced::advanced::renderer;
     use iced::advanced::widget::{self, Widget, tree::{State,Tag}};
@@ -13,11 +13,11 @@ mod circle {
     use iced::{Color, Length, Rectangle, Size, Point};
     use iced::advanced::graphics::geometry::frame::Backend;
     
-#[derive(Debug)]
-struct Slice {
-    path: iced::advanced::graphics::geometry::path::Path,
-    color: Color,
-}
+    #[derive(Debug)]
+    struct Slice {
+        path: iced::advanced::graphics::geometry::path::Path,
+        color: Color,
+    }
 
 
     pub struct RingGraph {
@@ -25,25 +25,28 @@ struct Slice {
         values: Vec<i32>,
     }
 
+    #[derive(Debug)]
     pub struct RingGraphState {
-        //cache: Cache<Renderer>,
+        slices: Vec<Slice>,
         values: Vec<i32>,
     }
 
     impl RingGraphState  {
          fn new(values: Vec<i32>) -> Self {
-            Self { values }
+            Self { values,  slices: vec![] }
         }
 
     }
 
     impl RingGraph {
 
-        pub fn new(radius: f32, values: Vec<i32>)  -> Self  {
+        pub fn new(values: Vec<i32>)  -> Self  {
 
-            Self { radius: 100.0, values }
+            Self { radius: 100.0, values: values }
         }
-
+        //We can call this the very first time we get the values for our widget
+        //that lets us remember it so we give it random colors only once, rather than every
+        //draw call...
         fn values_into_angles(&self, values: &Vec<i32>) -> Vec<f64> {
             let sum: i32 = values.iter().sum();
             //I think this is where i calculate what percentage every
@@ -92,8 +95,8 @@ struct Slice {
         }
     }
 
-    pub fn circle(radius: f32) -> RingGraph {
-        RingGraph::new(radius, vec![1,2,3,4])
+    pub fn ring_graph(values: Vec<i32>) -> RingGraph {
+        RingGraph::new( values )
     }
 
     impl widget::Meta for RingGraph {}
@@ -106,12 +109,18 @@ struct Slice {
             Size::new(Length::Fill, Length::Fill)
         }
 
+        /* okay this seems to be the first time in the lifecycle of the program that i know the limits of where
+        to draw myself.. 
+        */
         fn layout(
             &mut self,
             tree: &mut widget::Tree,
             _renderer: &Renderer,
             limits: &layout::Limits,
         ) {
+            //tried to get the sate from the tree.. doesn't work without &&mut... 
+            let my_state: &&mut RingGraphState = &tree.state.downcast_mut::<RingGraphState>();
+            println!("layout is called, with these arguments: {:?}, with state: {:?}",limits, my_state);
             //Node::new(limits.max())
             tree.size = limits.bounds();//Size::new(self.radius * 2.0, self.radius * 2.0);
         }
@@ -147,19 +156,20 @@ struct Slice {
         let geometry = frame.into_geometry();
         renderer.draw_geometry(geometry);
         }
-        /* We need to have *something* that */
+        /* this method is called exactly once! so that's useful so do some expensive work*/
         fn state(&self) -> State { 
                 println!("CREATING LE STATE.. should happen exactly only once :)");
-                State::Some(Box::new(RingGraphState::new(self.values.clone().into())))
+                State::Some(Box::new(RingGraphState::new(self.values.clone().into() )))
 
          }
+         /* This i don't really get, but it seems how other iced widgets are doing it */
          fn tag(&self) -> Tag {
             Tag::of::<RingGraphState>()
          }
     }
 }
 
-use circle::circle;
+use ring_graph::ring_graph;
 use iced::widget::{center, column, slider, text};
 use iced::{Center, Fit, Widget};
 
@@ -185,7 +195,7 @@ impl Example {
 
     fn view(&self) -> impl Widget<Message> {
         let content = column![
-            circle(self.radius),
+            ring_graph(vec![1,2,3,4]),
         ]
         .padding(20);
         //.spacing(20)
