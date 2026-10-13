@@ -5,17 +5,19 @@ mod ring_graph {
     use iced::advanced::widget::{self, Widget, tree::{State,Tag}};
     use iced::advanced::graphics::geometry::path::Builder as PathBuilder;
     use iced::widget::{canvas};
-    use iced::border;
     use iced::mouse;
-    use iced::advanced::graphics::geometry::path::Path;
-    //use iced::advanced::graphics::geometry::Cache;
-    use std::ops::Add;
     use iced::{Color, Length, Rectangle, Size, Point};
     use iced::advanced::graphics::geometry::frame::Backend;
     
     #[derive(Debug)]
     struct Slice {
         path: iced::advanced::graphics::geometry::path::Path,
+        color: Color,
+    }
+
+    #[derive(Debug, Clone)]
+    struct ColoredAngle {
+        angle: f64,
         color: Color,
     }
 
@@ -27,13 +29,12 @@ mod ring_graph {
 
     #[derive(Debug)]
     pub struct RingGraphState {
-        slices: Vec<Slice>,
-        values: Vec<i32>,
+        slices: Vec<ColoredAngle>
     }
 
     impl RingGraphState  {
-         fn new(values: Vec<i32>) -> Self {
-            Self { values,  slices: vec![] }
+         fn new( slices: Vec<ColoredAngle>) -> Self {
+            Self {  slices}
         }
 
     }
@@ -42,15 +43,13 @@ mod ring_graph {
 
         pub fn new(values: Vec<i32>)  -> Self  {
 
-            Self { radius: 100.0, values: values }
+            Self { radius: 100.0, values }
         }
         //We can call this the very first time we get the values for our widget
         //that lets us remember it so we give it random colors only once, rather than every
         //draw call...
-        fn values_into_angles(&self, values: &Vec<i32>) -> Vec<f64> {
+        fn values_into_angles(&self,  values: &[i32]) -> Vec<f64> {
             let sum: i32 = values.iter().sum();
-            //I think this is where i calculate what percentage every
-            //individual value is of the total
             values
                 .iter()
                 .map(|value| (*value as f64 / sum as f64) * 100.0)
@@ -58,8 +57,28 @@ mod ring_graph {
                 .collect::<Vec<f64>>()
         }
 
-        fn generate_slices_around(&self, center: Point) -> Vec<Slice> {
-            let segments = self.values_into_angles(&self.values);
+        fn get_random_colors(&self, amount: usize) -> Vec<Color> {
+            (0..amount).map(|_| {
+                let num: [f32; 3] = rand::random();
+                Color {
+                        r: num[0],
+                        g: num[1],
+                        b: num[2],
+                        a: 1.0,
+                }
+            }).collect()
+        }
+
+        //this could be what can actually be stored..
+        fn get_initial_slices(&self) -> Vec<ColoredAngle> {
+            let angles = self.values_into_angles(&self.values);
+            let colors = self.get_random_colors(angles.len());
+            colors.iter().zip(angles).map(|(a,b)|(*a,b)).map(|(c,d)| ColoredAngle { color: c, angle: d }).collect::<Vec<ColoredAngle>>()
+        }
+
+        fn generate_slices_around(&self, center: Point, angles: Vec<ColoredAngle>) -> Vec<Slice> {
+            //let slices
+            let segments = angles;//self.values_into_angles(&self.values);
             let mut start_angle = 0.0f64;
             let mut paths = vec![];
             for segment in segments {
@@ -68,28 +87,15 @@ mod ring_graph {
                         let arc = canvas::path::arc::Arc {
                             center,
                             radius: self.radius,
-                            start_angle: iced::Radians::from(iced::Degrees(start_angle as f32)),
-                            end_angle: iced::Radians::from(iced::Degrees(
-                                start_angle as f32 + segment as f32,
-                            )),
+                            start_angle: iced::Radians::from(iced::Degrees(start_angle as f32)) - iced::Radians(0.01),
+                            end_angle: iced::Radians::from(iced::Degrees((start_angle  + segment.angle) as f32)),
                         };
                         path_builder.arc(arc);
                     },
                 );
 
-                start_angle += segment as f64;
-                let num: [f32; 3] = rand::random();
-                let slice = Slice {
-                    path,
-                    color: Color {
-                        r: num[0],
-                        g: num[1],
-                        b: num[2],
-                        a: 1.0,
-                    },
-                };
-
-                paths.push(slice);
+                start_angle += segment.angle;
+                paths.push(Slice {path,color: segment.color });
             }
             paths
         }
@@ -119,9 +125,7 @@ mod ring_graph {
             limits: &layout::Limits,
         ) {
             //tried to get the sate from the tree.. doesn't work without &&mut... 
-            let my_state: &&mut RingGraphState = &tree.state.downcast_mut::<RingGraphState>();
-            println!("layout is called, with these arguments: {:?}, with state: {:?}",limits, my_state);
-            //Node::new(limits.max())
+            //let my_state: &&mut RingGraphState = &tree.state.downcast_mut::<RingGraphState>();
             tree.size = limits.bounds();//Size::new(self.radius * 2.0, self.radius * 2.0);
         }
 
@@ -140,17 +144,14 @@ mod ring_graph {
         let mut frame = renderer.new_frame(layout.bounds());
         //I want to draw the ring graph at the center of the available space
         let frame_center = layout.bounds().center();
-
-
-        //THIS IS THE PROBLEM! DON't Generate it like this, get it from the state! (the tree argument to this method holds the state)
-        //also, the state function we implemented *sets* 
-        let slices = self.generate_slices_around(frame_center);
+        let staty_staty_boi = _tree.state.downcast_ref::<RingGraphState>();
+        let slices = self.generate_slices_around(frame_center, staty_staty_boi.slices.clone());
 
         for slice in slices {
             let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default()
-                .with_width(30.0)
-                .with_color(slice.color)
-                .with_line_cap(iced::widget::canvas::LineCap::Round); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
+                .with_width(40.0)
+                .with_color(slice.color);
+                //.with_line_cap(iced::widget::canvas::LineCap::Round); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
             frame.stroke(&slice.path, stroke);
         }
         let geometry = frame.into_geometry();
@@ -159,7 +160,7 @@ mod ring_graph {
         /* this method is called exactly once! so that's useful so do some expensive work*/
         fn state(&self) -> State { 
                 println!("CREATING LE STATE.. should happen exactly only once :)");
-                State::Some(Box::new(RingGraphState::new(self.values.clone().into() )))
+                State::Some(Box::new( RingGraphState::new(  self.get_initial_slices()) ))
 
          }
          /* This i don't really get, but it seems how other iced widgets are doing it */
@@ -170,15 +171,14 @@ mod ring_graph {
 }
 
 use ring_graph::ring_graph;
-use iced::widget::{center, column, slider, text};
-use iced::{Center, Fit, Widget};
+use iced::widget::{center, column };
+use iced::Widget;
 
 pub fn main() -> iced::Result {
     iced::run(Example::update, Example::view)
 }
 
 struct Example {
-    radius: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -187,15 +187,15 @@ enum Message {
 
 impl Example {
     fn new() -> Self {
-        Example { radius: 50.0 }
+        Example {  }
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, _message: Message) {
     }
 
     fn view(&self) -> impl Widget<Message> {
         let content = column![
-            ring_graph(vec![1,2,3,4]),
+            ring_graph(vec![1,2,4, 66,3,4,55]),
         ]
         .padding(20);
         //.spacing(20)
