@@ -33,7 +33,6 @@ mod ring_graph {
     }
 
     pub struct RingGraph {
-        //radius: f32,
         values: Vec<i32>,
     }
 
@@ -49,7 +48,7 @@ mod ring_graph {
     }
 
     impl RingGraph {
-        pub fn new(values: Vec<i32>) -> Self {
+        pub fn new(values: Vec<(i32)>) -> Self {
             Self {
                 //radius: 100.0,
                 values,
@@ -164,7 +163,10 @@ mod ring_graph {
         ) {
             //tried to get the sate from the tree.. doesn't work without &&mut...
             //let my_state: &&mut RingGraphState = &tree.state.downcast_mut::<RingGraphState>();
-            tree.size = limits.bounds(); //Size::new(self.radius * 2.0, self.radius * 2.0);
+            
+            let smaller = limits.bounds().width.min(limits.bounds().height);
+
+            tree.size = Size {width: smaller, height: smaller};
         }
 
         fn draw(
@@ -231,7 +233,7 @@ impl Example {
     fn update(&mut self, _message: Message) {}
 
     fn view(&self) -> impl Widget<Message> {
-        let content = column![ring_graph(vec![1, 2, 4, 66, 3, 4, 55]),].padding(20);
+        let content = column![ring_graph(vec![1,2,3,4,5]),].padding(20);
         //.spacing(20)
         //.width(Fit.max(500))
         //.align_x(Center);
