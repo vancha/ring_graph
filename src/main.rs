@@ -1,8 +1,10 @@
 //! This example showcases a simple native custom widget that draws a circle.
 mod ring_graph {
     use iced::advanced::graphics::geometry::frame::Backend;
+    use iced::advanced::graphics::geometry::fill::Fill;
     use iced::advanced::graphics::geometry::path::Builder as PathBuilder;
     use iced::advanced::layout::{self, Layout};
+     use std::cmp::min;
     use iced::advanced::renderer;
     use iced::advanced::widget::{
         self,
@@ -13,7 +15,10 @@ mod ring_graph {
     use iced::widget::canvas;
     use iced::{Color, Length, Point, Rectangle, Size};
 
+    //For some reason when turning arcs into strokes, there's always a little cap visible in the eventual
+    //ring chart. Just adding a small offset makes that disappear. 
     const GAP_CLOSING_OFFSET: iced::Radians = iced::Radians(0.01);
+    const STROKE_WIDTH: f32 = 40.0;
 
     #[derive(Debug)]
     struct Slice {
@@ -28,7 +33,7 @@ mod ring_graph {
     }
 
     pub struct RingGraph {
-        radius: f32,
+        //radius: f32,
         values: Vec<i32>,
     }
 
@@ -46,7 +51,7 @@ mod ring_graph {
     impl RingGraph {
         pub fn new(values: Vec<i32>) -> Self {
             Self {
-                radius: 100.0,
+                //radius: 100.0,
                 values,
             }
         }
@@ -90,10 +95,22 @@ mod ring_graph {
                 .collect::<Vec<ColoredAngle>>()
         }
         //this now no longer does any color generation, it just takes the angles and colors as an argument
-        fn generate_slices_around(&self, center: Point, angles: Vec<ColoredAngle>) -> Vec<Slice> {
+        fn generate_slices_around(&self, angles: Vec<ColoredAngle>, available_space: iced::Rectangle) -> Vec<Slice> {
+            println!("space: {:?}",available_space);
+            //okay lets see how we want to calculate the size of our little ring.
+            //we want to know the smallest out of both width and height, because we need to assume we're drawing inside a
+            //little square, not a rectangle.
+            //so maybe let size = min()
+            //also make sure that we can't let the radius of our circle go past the edge of the space
+            //and ignore the width of the stroke itself
+            
             let segments = angles;
             let mut start_angle = 0.0f64;
             let mut paths = vec![];
+            let width = match available_space.width < available_space.height {
+                true => available_space.width,
+                false => available_space.height
+            } - STROKE_WIDTH ;
             for segment in segments {
                 let path = iced::advanced::graphics::geometry::path::Path::new(
                     |path_builder: &mut PathBuilder| {
@@ -103,8 +120,8 @@ mod ring_graph {
                             (start_angle + segment.angle) as f32,
                         ));
                         let arc = canvas::path::arc::Arc {
-                            center,
-                            radius: self.radius,
+                            center: available_space.center(),
+                            radius: width / 2.0,
                             start_angle: running_start,
                             end_angle: running_end,
                         };
@@ -164,20 +181,23 @@ mod ring_graph {
             //can't use that for a cool ring graph :(
             let mut frame = renderer.new_frame(layout.bounds());
             //I want to draw the ring graph at the center of the available space
-            let frame_center = layout.bounds().center();
+            let available_space = layout.bounds();
             let staty_staty_boi = _tree.state.downcast_ref::<RingGraphState>();
-            let slices = self.generate_slices_around(frame_center, staty_staty_boi.slices.clone());
+            let slices = self.generate_slices_around(staty_staty_boi.slices.clone(), available_space);
 
             for slice in slices {
                 let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default()
-                    .with_width(40.0)
+                    .with_width(STROKE_WIDTH)
                     .with_color(slice.color);
                 //.with_line_cap(iced::widget::canvas::LineCap::Round); //iced::advanced::graphics::geometry::stroke::Stroke::with_width( 1.0);
                 frame.stroke(&slice.path, stroke);
+                //frame.fill_rectangle(Point::new(0.0,0.0),layout.bounds().into(), Fill::default());
             }
             let geometry = frame.into_geometry();
+            
             renderer.draw_geometry(geometry);
         }
+
         /* this method is called exactly once! so that's useful so do some expensive work*/
         fn state(&self) -> State {
             println!("CREATING LE STATE.. should happen exactly only once :)");
