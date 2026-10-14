@@ -1,10 +1,9 @@
 //! This example showcases a simple native custom widget that draws a circle.
 mod ring_graph {
-    use iced::advanced::graphics::geometry::frame::Backend;
     use iced::advanced::graphics::geometry::fill::Fill;
+    use iced::advanced::graphics::geometry::frame::Backend;
     use iced::advanced::graphics::geometry::path::Builder as PathBuilder;
     use iced::advanced::layout::{self, Layout};
-     use std::cmp::min;
     use iced::advanced::renderer;
     use iced::advanced::widget::{
         self,
@@ -14,9 +13,10 @@ mod ring_graph {
     use iced::mouse;
     use iced::widget::canvas;
     use iced::{Color, Length, Point, Rectangle, Size};
+    use std::cmp::min;
 
     //For some reason when turning arcs into strokes, there's always a little cap visible in the eventual
-    //ring chart. Just adding a small offset makes that disappear. 
+    //ring chart. Just adding a small offset makes that disappear.
     const GAP_CLOSING_OFFSET: iced::Radians = iced::Radians(0.01);
     const STROKE_WIDTH: f32 = 40.0;
 
@@ -48,10 +48,10 @@ mod ring_graph {
     }
 
     impl RingGraph {
-        pub fn new(values: Vec<(i32)>) -> Self {
+        pub fn new(values: Vec<(String, i32)>) -> Self {
             Self {
                 //radius: 100.0,
-                values,
+                values: values.into_iter().map(|(a, b)| b).collect::<Vec<_>>(),
             }
         }
         //We can call this the very first time we get the values for our widget
@@ -94,22 +94,26 @@ mod ring_graph {
                 .collect::<Vec<ColoredAngle>>()
         }
         //this now no longer does any color generation, it just takes the angles and colors as an argument
-        fn generate_slices_around(&self, angles: Vec<ColoredAngle>, available_space: iced::Rectangle) -> Vec<Slice> {
-            println!("space: {:?}",available_space);
+        fn generate_slices_around(
+            &self,
+            angles: Vec<ColoredAngle>,
+            available_space: iced::Rectangle,
+        ) -> Vec<Slice> {
+            println!("space: {:?}", available_space);
             //okay lets see how we want to calculate the size of our little ring.
             //we want to know the smallest out of both width and height, because we need to assume we're drawing inside a
             //little square, not a rectangle.
             //so maybe let size = min()
             //also make sure that we can't let the radius of our circle go past the edge of the space
             //and ignore the width of the stroke itself
-            
+
             let segments = angles;
             let mut start_angle = 0.0f64;
             let mut paths = vec![];
             let width = match available_space.width < available_space.height {
                 true => available_space.width,
-                false => available_space.height
-            } - STROKE_WIDTH ;
+                false => available_space.height,
+            } - STROKE_WIDTH;
             for segment in segments {
                 let path = iced::advanced::graphics::geometry::path::Path::new(
                     |path_builder: &mut PathBuilder| {
@@ -138,7 +142,7 @@ mod ring_graph {
         }
     }
 
-    pub fn ring_graph(values: Vec<i32>) -> RingGraph {
+    pub fn ring_graph(values: Vec<(String, i32)>) -> RingGraph {
         RingGraph::new(values)
     }
 
@@ -152,6 +156,13 @@ mod ring_graph {
             Size::new(Length::Fill, Length::Fill)
         }
 
+        /* this seems to be what i need to do things like detect if there's someone hovering their mouse
+        over a graph segment.. Which in turn i will need to do to implement the animation i want. Idea:
+        when segment is hovered over, decrease saturation of all other segments, and make highlighted
+        segment increase in size. Have said animation take about 250ms or something? */
+         fn update(&mut self, _tree: &mut widget::Tree, _event: &iced::Event, _layout: iced::advanced::Layout, _cursor: iced::mouse::Cursor, _renderer: &Renderer, _shell: &mut iced::advanced::Shell<'_, Message>, _viewport: &iced::Rectangle) {
+            println!("I have the cursor! i have it! ;D {:?}",_cursor);
+        }
         /* okay this seems to be the first time in the lifecycle of the program that i know the limits of where
         to draw myself..
         */
@@ -163,10 +174,13 @@ mod ring_graph {
         ) {
             //tried to get the sate from the tree.. doesn't work without &&mut...
             //let my_state: &&mut RingGraphState = &tree.state.downcast_mut::<RingGraphState>();
-            
+
             let smaller = limits.bounds().width.min(limits.bounds().height);
 
-            tree.size = Size {width: smaller, height: smaller};
+            tree.size = Size {
+                width: smaller,
+                height: smaller,
+            };
         }
 
         fn draw(
@@ -185,7 +199,8 @@ mod ring_graph {
             //I want to draw the ring graph at the center of the available space
             let available_space = layout.bounds();
             let staty_staty_boi = _tree.state.downcast_ref::<RingGraphState>();
-            let slices = self.generate_slices_around(staty_staty_boi.slices.clone(), available_space);
+            let slices =
+                self.generate_slices_around(staty_staty_boi.slices.clone(), available_space);
 
             for slice in slices {
                 let stroke = iced::advanced::graphics::geometry::stroke::Stroke::default()
@@ -196,7 +211,7 @@ mod ring_graph {
                 //frame.fill_rectangle(Point::new(0.0,0.0),layout.bounds().into(), Fill::default());
             }
             let geometry = frame.into_geometry();
-            
+
             renderer.draw_geometry(geometry);
         }
 
@@ -213,27 +228,54 @@ mod ring_graph {
 }
 
 use iced::widget::{center, column};
+use iced::Subscription;
 use iced::Widget;
 use ring_graph::ring_graph;
+use iced::time::{self, Duration, Instant};
+
 
 pub fn main() -> iced::Result {
-    iced::run(Example::update, Example::view)
+    /* to be able to use an iced subscription, i can't seem to use iced::run, but i will have to change to
+    iced::application. Then i can pass in a subscription. */
+    //iced::run(Example::update, Example::view)
+    iced::application(Example::default, Example::update, Example::view)
+    //.subscription(Example::subscription)
+    .run()
 }
 
-struct Example {}
+struct Example {
+    timer_enabled:bool,
+}
 
 #[derive(Debug, Clone, Copy)]
-enum Message {}
+enum Message {
+    ExampleMessage(Instant)
+}
 
 impl Example {
     fn new() -> Self {
-        Example {}
+        Example {timer_enabled: true}
     }
 
-    fn update(&mut self, _message: Message) {}
+    fn update(&mut self, message: Message) {
+        match message {
+            Message::ExampleMessage(i) => {
+                println!("received an example message with instant: {:?}",i);
+            }
+        }
+    }
 
     fn view(&self) -> impl Widget<Message> {
-        let content = column![ring_graph(vec![1,2,3,4,5]),].padding(20);
+        /* widget takes owned values at the moment for simplicity. I can imagine other people will want to plot
+        data that is part of their applications struct for real world usecases.. that'll be implemented later*/
+        let content = column![ring_graph(vec![
+            (String::from("one"), 1),
+            (String::from("two"), 2),
+            (String::from("three"), 3),
+            (String::from("four"), 4),
+            (String::from("five"), 5)
+        ])]
+        .padding(25);
         //.spacing(20)
         //.width(Fit.max(500))
         //.align_x(Center);
